@@ -43,6 +43,7 @@ dependencies = [
 
 [project.scripts]
 dailyreport = "thoth_utils.dailyreport:main"
+mail-systemd-failure = "thoth_utils.mail_systemd_failure:main"
 update-dns = "thoth_utils.update_dns:main"
 
 [project.urls]
