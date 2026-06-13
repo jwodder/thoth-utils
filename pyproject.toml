@@ -5,7 +5,7 @@ build-backend = "hatchling.build"
 [project]
 name = "jwodder-thoth-utils"
 dynamic = ["version"]
-#description = ???
+description = "Utility scripts for thoth-system setup"
 #readme = "README.rst"
 requires-python = ">=3.11"
 license = "MIT"

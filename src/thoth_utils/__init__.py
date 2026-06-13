@@ -1,4 +1,6 @@
 """
+Utility scripts for thoth-system setup
+
 Visit <https://github.com/jwodder/thoth-utils> for more information.
 """
 
