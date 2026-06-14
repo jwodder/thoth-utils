@@ -1,4 +1,5 @@
 from __future__ import annotations
+from mailbox import mbox
 from pathlib import Path
 from shutil import disk_usage
 import socket
@@ -15,13 +16,20 @@ DISK_THRESHOLD = 75  # measured in percentage points
 TAGSEQ = "DISK REBOOT MAIL".split()
 
 
+def mkalias(s: str) -> str:
+    return s.replace("_", "-")
+
+
 class Config(BaseModel):
     sender: str
     recipient: str
-    mailbox: Path
+    mbox_dir: Path
     disks: list[str]
 
-    model_config = {"extra": "forbid"}
+    model_config = {
+        "alias_generator": mkalias,
+        "extra": "forbid",
+    }
 
 
 @click.command()
@@ -36,7 +44,7 @@ def main(configfile: Path) -> None:
     sender = from_config_file(configfile, fallback=False)
     tags: set[str] = set()
     reports = []
-    check_mailbox(cfg.mailbox, tags)
+    reports.append(check_mail(cfg.mbox_dir, tags))
     reports.append(check_reboot(tags))
     reports.append(check_load())
     for d in cfg.disks:
@@ -91,9 +99,37 @@ def check_disk(tags: set[str], path: str) -> str:
     )
 
 
-def check_mailbox(mailbox: Path, tags: set[str]) -> None:
-    if mailbox.exists() and mailbox.stat().st_size > 0:
-        tags.add("MAIL")
+def check_mail(mbox_dir: Path, tags: set[str]) -> str | None:
+    nonempty_boxes = []
+    for p in mbox_dir.iterdir():
+        if p.is_file() and p.stat().st_size > 0:
+            tags.add("MAIL")
+            qty: int | None
+            try:
+                mb = mbox(p, create=False)
+                mb.lock()
+                try:
+                    qty = len(mb)
+                finally:
+                    try:
+                        mb.unlock()
+                    except Exception:
+                        pass
+            except Exception:
+                qty = None
+            if qty is not None:
+                s = f"- {p} - {qty} message"
+                if qty != 1:
+                    s += "s"
+                nonempty_boxes.append(s)
+            else:
+                nonempty_boxes.append(f"- {p} - failed to count messages")
+    if nonempty_boxes:
+        return "There is mail in the following mailboxes:\n" + "".join(
+            f"{s}\n" for s in nonempty_boxes
+        )
+    else:
+        return None
 
 
 def check_reboot(tags: set[str]) -> str | None:
