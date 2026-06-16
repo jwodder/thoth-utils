@@ -10,6 +10,7 @@ import click
 from eletter import compose
 from outgoing import from_config_file
 from pydantic import BaseModel
+from .util import get_config_path
 
 DISK_THRESHOLD = 75  # measured in percentage points
 
@@ -33,11 +34,8 @@ class Config(BaseModel):
 
 
 @click.command()
-@click.argument(
-    "configfile",
-    type=click.Path(exists=True, readable=True, dir_okay=False, path_type=Path),
-)
-def main(configfile: Path) -> None:
+def main() -> None:
+    configfile = get_config_path()
     with configfile.open("rb") as fp:
         data = tomllib.load(fp)
     cfg = Config.model_validate(data.get("dailyreport", {}))

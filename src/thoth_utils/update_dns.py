@@ -1,13 +1,13 @@
 from __future__ import annotations
 from dataclasses import InitVar, dataclass, field
 import logging
-from pathlib import Path
 import tomllib
 from types import TracebackType
 import click
 from click_loglevel import LogLevel
 from pydantic import BaseModel
 import requests
+from .util import get_config_path
 
 log = logging.getLogger("update_dns")
 
@@ -111,17 +111,13 @@ class DigitalOceanClient:
     help="Set logging level",
     show_default=True,
 )
-@click.argument(
-    "configfile",
-    type=click.Path(exists=True, readable=True, dir_okay=False, path_type=Path),
-)
-def main(configfile: Path, log_level: int) -> None:
+def main(log_level: int) -> None:
     logging.basicConfig(
         format="%(asctime)s [%(levelname)-8s] %(name)s: %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S%z",
         level=log_level,
     )
-    with configfile.open("rb") as fp:
+    with get_config_path().open("rb") as fp:
         data = tomllib.load(fp)
     cfg = Config.model_validate(data.get("update-dns", {}))
     with DigitalOceanClient(token=cfg.digital_ocean_token) as doclient:

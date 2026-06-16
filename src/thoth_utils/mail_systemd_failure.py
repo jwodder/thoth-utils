@@ -1,6 +1,5 @@
 from __future__ import annotations
 import os
-from pathlib import Path
 import socket
 import subprocess
 import tomllib
@@ -8,6 +7,7 @@ import click
 from eletter import compose
 from outgoing import from_config_file
 from pydantic import BaseModel
+from .util import get_config_path
 
 
 class Config(BaseModel):
@@ -18,12 +18,9 @@ class Config(BaseModel):
 
 
 @click.command()
-@click.argument(
-    "configfile",
-    type=click.Path(exists=True, readable=True, dir_okay=False, path_type=Path),
-)
 @click.argument("unit")
-def main(configfile: Path, unit: str) -> None:
+def main(unit: str) -> None:
+    configfile = get_config_path()
     with configfile.open("rb") as fp:
         data = tomllib.load(fp)
     cfg = Config.model_validate(data.get("mail-systemd-failure", {}))

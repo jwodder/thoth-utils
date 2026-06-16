@@ -37,6 +37,7 @@ dependencies = [
     "eletter ~= 0.5",
     "outgoing ~= 0.6",
     "outgoing-mailgun ~= 0.3",
+    "platformdirs ~= 4.0",
     "pydantic ~= 2.0",
     "requests ~= 2.20",
 ]
