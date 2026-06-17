@@ -93,7 +93,7 @@ def check_disk(tags: set[str], path: str) -> str:
         f"Space used on {path}:\n"
         f"    {sused:>{width}}\n"
         f"  / {ssize:>{width}}\n"
-        f"   ({pctused}%)\n"
+        f"   ({pctused:.2f}%)\n"
     )
 
 
