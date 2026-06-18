@@ -47,9 +47,10 @@ def main(send: bool) -> None:
     reports.append(check_load())
     for d in cfg.disks:
         reports.append(check_disk(tags, d))
-    body = "\n".join(r for r in reports if r is not None and r != "")
+    body = "\n\n".join(r for r in reports if r is not None and r != "")
     if not body:
-        body = "Nothing to report\n"
+        body = "Nothing to report"
+    body += "\n"
     subject = ""
     for t in TAGSEQ:
         if t in tags:
@@ -73,7 +74,7 @@ def main(send: bool) -> None:
 
 def check_load() -> str:
     with open("/proc/loadavg") as fp:
-        return "Load: " + ", ".join(fp.read().split()[:3]) + "\n"
+        return "Load: " + ", ".join(fp.read().split()[:3])
 
 
 def check_disk(tags: set[str], path: str) -> str:
@@ -88,7 +89,7 @@ def check_disk(tags: set[str], path: str) -> str:
         f"Space used on {path}:\n"
         f"    {sused:>{width}}\n"
         f"  / {ssize:>{width}}\n"
-        f"   ({pctused:.2f}%)\n"
+        f"   ({pctused:.2f}%)"
     )
 
 
@@ -118,9 +119,7 @@ def check_mail(mbox_dir: Path, tags: set[str]) -> str | None:
             else:
                 nonempty_boxes.append(f"- {p} - failed to count messages")
     if nonempty_boxes:
-        return "There is mail in the following mailboxes:\n" + "".join(
-            f"{s}\n" for s in nonempty_boxes
-        )
+        return "There is mail in the following mailboxes:\n" + "\n".join(nonempty_boxes)
     else:
         return None
 
@@ -135,9 +134,9 @@ def check_reboot(tags: set[str]) -> str | None:
             pkgs = []
         report = "Reboot required by the following packages:"
         if pkgs:
-            report += "\n" + "".join("    " + s + "\n" for s in pkgs)
+            report += "\n" + "\n".join(f"    {s}" for s in pkgs)
         else:
-            report += " UNKNOWN\n"
+            report += " UNKNOWN"
         return report
     else:
         return None
