@@ -3,7 +3,6 @@ from mailbox import mbox
 from pathlib import Path
 from shutil import disk_usage
 import socket
-import sys
 import time
 import tomllib
 import click
@@ -34,7 +33,8 @@ class Config(BaseModel):
 
 
 @click.command()
-def main() -> None:
+@click.option("--send", is_flag=True)
+def main(send: bool) -> None:
     configfile = get_config_path()
     with configfile.open("rb") as fp:
         data = tomllib.load(fp)
@@ -58,22 +58,17 @@ def main() -> None:
     for t in sorted(tags):
         subject += "[" + t + "] "
     subject += f"Status Report: {socket.gethostname()}, {iso8601_Z()}"
-    if sys.stdout.isatty():
+    if send:
+        msg = compose(subject=subject, from_=cfg.sender, to=[cfg.recipient], text=body)
+        with sender:
+            sender.send(msg)
+    else:
         # Something about typical dailyreport contents (the size? long lines?)
         # invariably causes serialized EmailMessage's to use quoted-printable
         # transfer encoding no matter what I do.  Thus, in order to actually be
         # able to view non-ASCII characters in subjects of recently-received
-        # e-mails in `less`, we need to basically output a pseudo-e-email.
+        # e-mails in `less`, we need to basically output a pseudo-e-mail.
         click.echo_via_pager(f"Subject: {subject}\n\n{body}".rstrip("\n"))
-    else:
-        msg = compose(
-            subject=subject,
-            from_=cfg.sender,
-            to=[cfg.recipient],
-            text=body,
-        )
-        with sender:
-            sender.send(msg)
 
 
 def check_load() -> str:
