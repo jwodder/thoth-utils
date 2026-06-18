@@ -40,9 +40,11 @@ dependencies = [
     "platformdirs ~= 4.0",
     "pydantic ~= 2.0",
     "requests ~= 2.20",
+    "txtble ~= 0.12",
 ]
 
 [project.scripts]
+authfail = "thoth_utils.authfail:main"
 dailyreport = "thoth_utils.dailyreport:main"
 mail-systemd-failure = "thoth_utils.mail_systemd_failure:main"
 update-dns = "thoth_utils.update_dns:main"

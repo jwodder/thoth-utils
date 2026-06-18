@@ -9,6 +9,7 @@ import click
 from eletter import compose
 from outgoing import from_config_file
 from pydantic import BaseModel
+from .authfail import AuthfailDB
 from .util import get_config_path
 
 DISK_THRESHOLD = 75  # measured in percentage points
@@ -45,6 +46,7 @@ def main(send: bool) -> None:
     reports.append(check_mail(cfg.mbox_dir, tags))
     reports.append(check_reboot(tags))
     reports.append(check_load())
+    reports.append(check_authfail())
     for d in cfg.disks:
         reports.append(check_disk(tags, d))
     body = "\n\n".join(r for r in reports if r is not None and r != "")
@@ -140,6 +142,11 @@ def check_reboot(tags: set[str]) -> str | None:
         return report
     else:
         return None
+
+
+def check_authfail() -> str:
+    with AuthfailDB.connect() as db:
+        return db.dailyreport()
 
 
 def longint(n: int) -> str:
