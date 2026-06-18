@@ -2,13 +2,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 import json
+from pathlib import Path
 import re
 import sqlite3
 import sys
 import traceback
 from types import TracebackType
 import click
-from platformdirs import user_state_path
+from platformdirs import user_log_path, user_state_path
 from txtble import Txtble
 
 SCHEMA = """
@@ -115,36 +116,54 @@ def main(vacuum: bool) -> None:
             db.vacuum(timedelta(days=VACUUM_DAYS_OLD))
     else:
         line = None
-        try:
-            with AuthfailDB.connect() as db:
-                # `for line in sys.stdin` cannot be used here because Python buffers
-                # stdin when iterating over it, causing the script to wait for some
-                # too-large number of lines to be passed to it until it'll do anything.
-                for line in iter(sys.stdin.readline, ""):
-                    for rgx in MSG_REGEXEN:
-                        if m := rgx.fullmatch(line):
-                            db.add_record(
-                                timestamp=datetime.fromisoformat(m["timestamp"]),
-                                username=m["username"],
-                                src_addr=m["src_addr"],
+        p = authfail_log_path()
+        p.parent.mkdir(parents=True, exist_ok=True)
+        with p.open("w", encoding="utf-8") as fp:
+            try:
+                with AuthfailDB.connect() as db:
+                    # `for line in sys.stdin` cannot be used here because Python buffers
+                    # stdin when iterating over it, causing the script to wait for some
+                    # too-large number of lines to be passed to it until it'll
+                    # do anything.
+                    for line in iter(sys.stdin.readline, ""):
+                        for rgx in MSG_REGEXEN:
+                            if m := rgx.fullmatch(line):
+                                db.add_record(
+                                    timestamp=datetime.fromisoformat(m["timestamp"]),
+                                    username=m["username"],
+                                    src_addr=m["src_addr"],
+                                )
+                                break
+                        else:
+                            print(
+                                json.dumps(
+                                    {
+                                        "time": datetime.now().astimezone().isoformat(),
+                                        "line": line,
+                                        "error_type": "ParseError",
+                                        "error": "Could not parse logfile entry",
+                                    }
+                                ),
+                                file=fp,
                             )
-                            break
-                    else:
-                        print(
-                            f"Could not parse logfile entry: {line!r}", file=sys.stderr
-                        )
-        except Exception as e:
-            sys.exit(
-                json.dumps(
-                    {
-                        "time": datetime.now().astimezone().isoformat(),
-                        "line": line,
-                        "traceback": traceback.format_exc(),
-                        "error_type": type(e).__name__,
-                        "error": str(e),
-                    }
-                ),
-            )
+            except Exception as e:
+                print(
+                    json.dumps(
+                        {
+                            "time": datetime.now().astimezone().isoformat(),
+                            "line": line,
+                            "traceback": traceback.format_exc(),
+                            "error_type": type(e).__name__,
+                            "error": str(e),
+                        }
+                    ),
+                    file=fp,
+                )
+                sys.exit(1)
+
+
+def authfail_log_path() -> Path:
+    return user_log_path("thoth-utils", "jwodder") / "authfail.log"
 
 
 if __name__ == "__main__":

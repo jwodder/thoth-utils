@@ -9,12 +9,12 @@ import click
 from eletter import compose
 from outgoing import from_config_file
 from pydantic import BaseModel
-from .authfail import AuthfailDB
+from .authfail import AuthfailDB, authfail_log_path
 from .util import get_config_path
 
 DISK_THRESHOLD = 75  # measured in percentage points
 
-TAGSEQ = "DISK REBOOT MAIL".split()
+TAGSEQ = "DISK LOGERR REBOOT MAIL".split()
 
 
 def mkalias(s: str) -> str:
@@ -43,6 +43,7 @@ def main(send: bool) -> None:
     sender = from_config_file(configfile, fallback=False)
     tags: set[str] = set()
     reports = []
+    reports.append(check_errlogs(tags))
     reports.append(check_mail(cfg.mbox_dir, tags))
     reports.append(check_reboot(tags))
     reports.append(check_load())
@@ -72,6 +73,22 @@ def main(send: bool) -> None:
         # able to view non-ASCII characters in subjects of recently-received
         # e-mails in `less`, we need to basically output a pseudo-e-mail.
         click.echo_via_pager(f"Subject: {subject}\n\n{body}".rstrip("\n"))
+
+
+def check_errlogs(tags: set[str]) -> str | None:
+    logpaths = [authfail_log_path()]
+    nonempty = []
+    for p in logpaths:
+        try:
+            if p.stat().st_size > 0:
+                nonempty.append(p)
+        except FileNotFoundError:
+            pass
+    if nonempty:
+        tags.add("LOGERR")
+        return "Nonempty logfiles:\n" + "\n".join("    {p}" for p in nonempty)
+    else:
+        return None
 
 
 def check_load() -> str:
