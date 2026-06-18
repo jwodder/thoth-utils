@@ -17,7 +17,7 @@ class Config(BaseModel):
     model_config = {"extra": "forbid"}
 
 
-@click.command()
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.argument("unit")
 def main(unit: str) -> None:
     configfile = get_config_path()

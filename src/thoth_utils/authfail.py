@@ -108,7 +108,7 @@ sqlite3.register_adapter(datetime, adapt_datetime)
 sqlite3.register_converter("timestamp", convert_datetime)
 
 
-@click.command()
+@click.command(context_settings={"help_option_names": ["-h", "--help"]})
 @click.option("--vacuum", is_flag=True)
 def main(vacuum: bool) -> None:
     if vacuum:
