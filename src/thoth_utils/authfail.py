@@ -23,14 +23,14 @@ CREATE TABLE IF NOT EXISTS authfail (
 
 MSG_REGEXEN = [
     re.compile(
-        r"(?P<timestamp>\S+) \S+ sshd\[\d+\]:"
+        r"(?P<timestamp>\S+) \S+ sshd(?:-session)?\[\d+\]:"
         r"(?: message repeated \d+ times: \[)?"
         r" Failed (?:password|keyboard-interactive/pam|none)"
         r" for (?:invalid user )?(?P<username>.+?)"
         r" from (?P<src_addr>\S+) port \d+ ssh2\]?\s*"
     ),
     re.compile(
-        r"(?P<timestamp>\S+) \S+ sshd\[\d+\]:"
+        r"(?P<timestamp>\S+) \S+ sshd(?:-session)?\[\d+\]:"
         r"(?: message repeated \d+ times: \[)?"
         r" Invalid user (?P<username>.*?)"
         r" from (?P<src_addr>\S+) port \d+\s*",
