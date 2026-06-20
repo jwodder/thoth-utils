@@ -1,6 +1,7 @@
 from __future__ import annotations
 from mailbox import mbox
 from pathlib import Path
+import re
 from shutil import disk_usage
 import socket
 import subprocess
@@ -47,6 +48,7 @@ def main(send: bool) -> None:
     reports.append(check_mail(cfg.mbox_dir, tags))
     reports.append(check_reboot(tags))
     reports.append(check_load())
+    reports.append(check_throttled())
     reports.append(check_authfail())
     for d in cfg.disks:
         reports.append(check_disk(tags, d))
@@ -79,6 +81,40 @@ def main(send: bool) -> None:
 def check_load() -> str:
     with open("/proc/loadavg") as fp:
         return "Load: " + ", ".join(fp.read().split()[:3])
+
+
+def check_throttled() -> str | None:
+    # <https://www.raspberrypi.com/documentation/computers/os.html#get_throttled>
+    # <https://gist.github.com/Paraphraser/17fb6320d0e896c6446fb886e1207c7e#the-vcgencmd_power_reportsh-script>
+    r = subprocess.run(
+        ["vcgencmd", "get_throttled"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    if (m := re.fullmatch(r"throttled=0x([0-9A-Fa-f]+)", r.stdout.strip())) is not None:
+        throttled = int(m[1], base=16)
+        events = []
+        if throttled & (1 << 16):
+            events.append("Undervoltage")
+        if throttled & (1 << 17):
+            events.append("Arm frequency capping")
+        if throttled & (1 << 18):
+            events.append("Throttling")
+        if throttled & (1 << 19):
+            events.append("Soft temperature limit")
+        if events:
+            return (
+                "The following throttling events have occurred since last reboot:\n"
+                + "\n".join(f"- {ev}" for ev in events)
+            )
+        else:
+            return None
+    else:
+        raise ValueError(
+            "Could not parse `vcgencmd get_throttled` output: {r.stdout!r}"
+        )
 
 
 def check_disk(tags: set[str], path: str) -> str:
