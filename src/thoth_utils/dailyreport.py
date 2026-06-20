@@ -49,9 +49,9 @@ def main(send: bool) -> None:
     reports.append(check_reboot(tags))
     reports.append(check_load())
     reports.append(check_throttled())
-    reports.append(check_authfail())
     for d in cfg.disks:
         reports.append(check_disk(tags, d))
+    reports.append(check_authfail())
     reports.append(check_authfail_stderr())
     body = "\n\n".join(r for r in reports if r is not None and r != "")
     if not body:
@@ -76,6 +76,55 @@ def main(send: bool) -> None:
         # able to view non-ASCII characters in subjects of recently-received
         # e-mails in `less`, we need to basically output a pseudo-e-mail.
         click.echo_via_pager(f"Subject: {subject}\n\n{body}".rstrip("\n"))
+
+
+def check_mail(mbox_dir: Path, tags: set[str]) -> str | None:
+    nonempty_boxes = []
+    for p in mbox_dir.iterdir():
+        if p.is_file() and p.stat().st_size > 0:
+            tags.add("MAIL")
+            qty: int | None
+            try:
+                mb = mbox(p, create=False)
+                mb.lock()
+                try:
+                    qty = len(mb)
+                finally:
+                    try:
+                        mb.unlock()
+                    except Exception:
+                        pass
+            except Exception:
+                qty = None
+            if qty is not None:
+                s = f"- {p} - {qty} message"
+                if qty != 1:
+                    s += "s"
+                nonempty_boxes.append(s)
+            else:
+                nonempty_boxes.append(f"- {p} - failed to count messages")
+    if nonempty_boxes:
+        return "There is mail in the following mailboxes:\n" + "\n".join(nonempty_boxes)
+    else:
+        return None
+
+
+def check_reboot(tags: set[str]) -> str | None:
+    if Path("/var/run/reboot-required").exists():
+        tags.add("REBOOT")
+        try:
+            with open("/var/run/reboot-required.pkgs") as fp:
+                pkgs = fp.read().splitlines()
+        except OSError:
+            pkgs = []
+        report = "Reboot required by the following packages:"
+        if pkgs:
+            report += "\n" + "\n".join(f"    {s}" for s in pkgs)
+        else:
+            report += " UNKNOWN"
+        return report
+    else:
+        return None
 
 
 def check_load() -> str:
@@ -131,55 +180,6 @@ def check_disk(tags: set[str], path: str) -> str:
         f"  / {ssize:>{width}}\n"
         f"   ({pctused:.2f}%)"
     )
-
-
-def check_mail(mbox_dir: Path, tags: set[str]) -> str | None:
-    nonempty_boxes = []
-    for p in mbox_dir.iterdir():
-        if p.is_file() and p.stat().st_size > 0:
-            tags.add("MAIL")
-            qty: int | None
-            try:
-                mb = mbox(p, create=False)
-                mb.lock()
-                try:
-                    qty = len(mb)
-                finally:
-                    try:
-                        mb.unlock()
-                    except Exception:
-                        pass
-            except Exception:
-                qty = None
-            if qty is not None:
-                s = f"- {p} - {qty} message"
-                if qty != 1:
-                    s += "s"
-                nonempty_boxes.append(s)
-            else:
-                nonempty_boxes.append(f"- {p} - failed to count messages")
-    if nonempty_boxes:
-        return "There is mail in the following mailboxes:\n" + "\n".join(nonempty_boxes)
-    else:
-        return None
-
-
-def check_reboot(tags: set[str]) -> str | None:
-    if Path("/var/run/reboot-required").exists():
-        tags.add("REBOOT")
-        try:
-            with open("/var/run/reboot-required.pkgs") as fp:
-                pkgs = fp.read().splitlines()
-        except OSError:
-            pkgs = []
-        report = "Reboot required by the following packages:"
-        if pkgs:
-            report += "\n" + "\n".join(f"    {s}" for s in pkgs)
-        else:
-            report += " UNKNOWN"
-        return report
-    else:
-        return None
 
 
 def check_authfail() -> str:
