@@ -3,13 +3,14 @@ from mailbox import mbox
 from pathlib import Path
 from shutil import disk_usage
 import socket
+import subprocess
 import time
 import tomllib
 import click
-from eletter import compose
+from eletter import compose, reply_quote
 from outgoing import from_config_file
 from pydantic import BaseModel
-from .authfail import AuthfailDB, authfail_log_path
+from .authfail import AuthfailDB
 from .util import get_config_path
 
 DISK_THRESHOLD = 75  # measured in percentage points
@@ -43,13 +44,13 @@ def main(send: bool) -> None:
     sender = from_config_file(configfile, fallback=False)
     tags: set[str] = set()
     reports = []
-    reports.append(check_errlogs(tags))
     reports.append(check_mail(cfg.mbox_dir, tags))
     reports.append(check_reboot(tags))
     reports.append(check_load())
     reports.append(check_authfail())
     for d in cfg.disks:
         reports.append(check_disk(tags, d))
+    reports.append(check_authfail_stderr())
     body = "\n\n".join(r for r in reports if r is not None and r != "")
     if not body:
         body = "Nothing to report"
@@ -73,22 +74,6 @@ def main(send: bool) -> None:
         # able to view non-ASCII characters in subjects of recently-received
         # e-mails in `less`, we need to basically output a pseudo-e-mail.
         click.echo_via_pager(f"Subject: {subject}\n\n{body}".rstrip("\n"))
-
-
-def check_errlogs(tags: set[str]) -> str | None:
-    logpaths = [authfail_log_path()]
-    nonempty = []
-    for p in logpaths:
-        try:
-            if p.stat().st_size > 0:
-                nonempty.append(p)
-        except FileNotFoundError:
-            pass
-    if nonempty:
-        tags.add("LOGERR")
-        return "Nonempty logfiles:\n" + "\n".join("    {p}" for p in nonempty)
-    else:
-        return None
 
 
 def check_load() -> str:
@@ -164,6 +149,22 @@ def check_reboot(tags: set[str]) -> str | None:
 def check_authfail() -> str:
     with AuthfailDB.connect() as db:
         return db.dailyreport()
+
+
+def check_authfail_stderr() -> str | None:
+    r = subprocess.run(
+        ["journalctl", "--quiet", "--since=-24h", "_SYSTEMD_UNIT=authfail.service"],
+        check=True,
+        stdout=subprocess.PIPE,
+        text=True,
+        encoding="utf-8",
+    )
+    if r.stdout:
+        return "Stderr from authfail in the past 24 hours:\n\n" + reply_quote(
+            r.stdout
+        ).rstrip("\n")
+    else:
+        return None
 
 
 def longint(n: int) -> str:
