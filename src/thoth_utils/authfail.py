@@ -117,11 +117,7 @@ def main(vacuum: bool) -> None:
         line = None
         try:
             with AuthfailDB.connect() as db:
-                # `for line in sys.stdin` cannot be used here because Python buffers
-                # stdin when iterating over it, causing the script to wait for some
-                # too-large number of lines to be passed to it until it'll
-                # do anything.
-                for line in iter(sys.stdin.readline, ""):
+                for line in sys.stdin:
                     for rgx in MSG_REGEXEN:
                         if m := rgx.fullmatch(line):
                             db.add_record(
